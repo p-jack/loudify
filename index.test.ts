@@ -7,6 +7,14 @@ import {
   Tx
 } from "./index"
 
+import { 
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  test,
+} from 'vitest'
+
 afterEach(() => {
   extendWith(<T extends object>(loud:Loud<T>, quiet:T) => {})
   compareWith(Object.is)

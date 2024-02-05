@@ -11,6 +11,7 @@
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
     "moduleDetection": "force",
+    "moduleResolution": "Node10",
     "isolatedModules": true,
     "sourceMap": true
   },
