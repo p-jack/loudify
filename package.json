@@ -1,10 +1,11 @@
 {
   "name": "loudify",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Create \"Loud\" objects that can broadcast changes.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "module": "dist/index.js",
   "files": [
     "dist/index.js",
     "dist/index.d.ts"
