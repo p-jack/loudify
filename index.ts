@@ -9,7 +9,7 @@ type Same<T1,T2> =
   (<G>() => G extends T2 ? 1 : 2) ? true : false;
 
 // All keys of T that are either (a) writable properties or (b) functions
-type LoudKey<T> = 
+export type LoudKey<T> = 
 { [K in keyof T]: Same<Pick<T,K>, Record<K,T[K]>> extends true ? K : never }[keyof T]
 
 interface Hear<T extends object> {
