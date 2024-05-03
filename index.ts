@@ -1,14 +1,30 @@
 export type Ear<T> = (changed:T)=>void;
 
+export type Mutable<T extends object> = { -readonly [K in keyof T]: T[K] }
+
 let globalBlock = false
 
-interface Ears<T extends object> {
-  readonly hear:(key:keyof T, ear:Ear<Loud<T>>)=>void
-  readonly stopHearing:(key:keyof T, ear:Ear<Loud<T>>)=>void
-  readonly isHearing:(keys:keyof T, ear:Ear<Loud<T>>)=>boolean
+type Same<T1,T2> =
+  (<G>() => G extends T1 ? 1 : 2) extends
+  (<G>() => G extends T2 ? 1 : 2) ? true : false;
+
+// All keys of T that are either (a) writable properties or (b) functions
+type LoudKey<T> = 
+{ [K in keyof T]: Same<Pick<T,K>, Record<K,T[K]>> extends true ? K : never }[keyof T]
+
+interface Hear<T extends object> {
+  readonly hear:(key:LoudKey<T>, ear:Ear<Loud<T>>)=>void
+  readonly unhear:(key:LoudKey<T>, ear:Ear<Loud<T>>)=>void
+  readonly isHearing:(keys:LoudKey<T>, ear:Ear<Loud<T>>)=>boolean
 }
 
-export type Loud<T extends object> = Ears<T> & T
+export type Loud<T extends object> = Hear<T> & T
+
+class Quiet<T> {
+  constructor(readonly value:T) {}
+}
+
+export const quiet = <T>(value:T):T => new Quiet(value) as never
 
 const earSymbol = Symbol("ears")
 
@@ -27,7 +43,29 @@ export const loudify = <T extends object>(object:T):Loud<T> => {
         set?.forEach(ear => { ear(proxy as Loud<T>) })
       }
       return true
-    }
+    },
+    get:(target:any, p:string | symbol, receiver:any):any => {
+      const value = target[p]
+      if (value instanceof Function) {
+        return function (...args:any) {
+          const oldGlobalBlock = globalBlock
+          globalBlock = true
+          let result
+          try {
+            result = value.apply(receiver, args)
+          } finally {
+            globalBlock = oldGlobalBlock
+          }
+          if (result instanceof Quiet) {
+            return result.value
+          }
+          const set = ears.get(p as keyof T)
+          set?.forEach(ear => { ear(proxy as Loud<T>) })
+          return result
+        }
+      }
+      return value
+    },
   })
   proxy[earSymbol] = ears
   proxy["hear"] = (property:keyof T, ear:E) => {
@@ -42,7 +80,7 @@ export const loudify = <T extends object>(object:T):Loud<T> => {
     ear(proxy as never)
     return;
   }
-  proxy["stopHearing"] = (property:keyof T, ear:E) => {
+  proxy["unhear"] = (property:keyof T, ear:E) => {
     const set = ears.get(property)
     set?.delete(ear)
   }
@@ -53,7 +91,6 @@ export const loudify = <T extends object>(object:T):Loud<T> => {
   extend(proxy, object)
   return proxy as never
 }
-
 
 interface Batch<T extends object> {
   target:Loud<T>
@@ -75,6 +112,7 @@ export class Tx {
   }
 
   readonly commit = () => {
+    const oldGlobalBlock = globalBlock
     globalBlock = true
     const batches = this.batches
     const changed:Set<string>[] = []
@@ -102,11 +140,10 @@ export class Tx {
         }
       }
     } finally {
-      globalBlock = false
+      globalBlock = oldGlobalBlock
     }  
   }
 }
-
 
 let extend = <T extends object>(loud:Loud<T>, observed:T) => {}
 export const extendWith = (extender:<T extends object>(loud:Loud<T>, observed:T)=>void) => {
@@ -118,7 +155,7 @@ export const compareWith = (comparer:(a:any, b:any)=>boolean) => {
   compare = comparer
 }
 
-let check = <T extends object,K extends keyof T>(obj:T, key:K, value:T[K]):void => {}
-export const checkWith = (checker:<T extends object,K extends keyof T>(obj:T, key:keyof T, value:T[K])=>void) => {
+let check = <T extends object>(obj:T, key:keyof T, value:T[typeof key]):void => {}
+export const checkWith = (checker:<T extends object>(obj:T, key:keyof T, value:T[typeof key])=>void) => {
   check = checker
 }

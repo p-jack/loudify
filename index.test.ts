@@ -4,7 +4,9 @@ import {
   extendWith,
   compareWith,
   checkWith,
-  Tx
+  Tx,
+  Mutable,
+  quiet
 } from "./index"
 
 import { 
@@ -21,25 +23,44 @@ afterEach(() => {
   checkWith(<T extends object,K extends keyof T>(o:T, k:K, v:T[K]):void => {})
 })
 
+test("not checked by default", () => {
+  const obj = loudify({ n:0 })
+  expect(() => { obj.n = undefined as never }).not.toThrowError()
+})
+
 describe("loudify", () => {
-  type I = { id:number, email:string }
+  class I {
+    constructor(
+      public id:number,
+      public email:string,
+      public readonly firstName:string,
+      public readonly lastName:string,
+    ) {}
+    public get name() { return this.firstName + " " + this.lastName }
+    public setName = (first:string, last:string) => {
+      (this as Record<string,unknown>).firstName = first;
+      (this as Record<string,unknown>).lastName = last;
+      return this.name
+    }
+  }
   let obj:Loud<I>
   let captured:I|undefined
   const ear = (v:Loud<I>) => {
     captured = v
   }
   beforeEach(() => { 
-    obj = loudify({
-      id: 0,
-      email: "fake@example.com"
-    })
+    const input = new I(0, "fake@example.com", "First", "Last")
+    obj = loudify(input)
     captured = undefined 
   })
   test("notified right away when heard", () => {
     obj.hear("email", ear)
     expect(captured).toBe(obj)
+    captured = undefined
+    obj.hear("setName", ear)
+    expect(captured).toBe(obj)
   })
-  test("hear and stopHearing", () => {
+  test("hear and unhear", () => {
     expect(obj.isHearing("email", ear)).toBe(false)
     obj.hear("email", ear)
     expect(obj.isHearing("email", ear)).toBe(true)
@@ -48,7 +69,7 @@ describe("loudify", () => {
     obj.email = "fake2@example.com"
     expect(captured).toBe(obj)  
     captured = undefined
-    obj.stopHearing("email", ear)
+    obj.unhear("email", ear)
     expect(obj.isHearing("email", ear)).toBe(false)
     obj.email = "fake3@example.com"
     expect(captured).toBeUndefined()
@@ -79,6 +100,81 @@ describe("loudify", () => {
     expect(captured).toBe(obj)
     expect(captured2).toBe(obj)
   })
+  test("function calls", () => {
+    obj.hear("setName", ear)
+    expect(captured).toBe(obj)
+    captured = undefined
+    obj.setName("Foo", "Bar")
+    expect(obj.name).toBe("Foo Bar")
+    expect(captured).toBe(obj)
+  })
+})
+
+test("nested function calls", () => {
+  class C {
+    constructor(
+      readonly x:number = 0,
+      readonly y:number = 0,
+      readonly dirty:boolean = false,
+      readonly version:number = 0,
+    ) {}
+    get sum() { return this.x + this.y }
+    setDirty = () => {
+      const o = this as Mutable<C>
+      o.version++
+      o.dirty = true
+    }
+    setNums(x:number, y:number):number {
+      const o = this as Mutable<C>
+      o.x = x
+      o.y = y
+      this.setDirty()
+      return this.sum
+    }
+  }
+  const obj = loudify(new C())
+  let captured:Loud<C>|undefined = undefined
+  let count = 0
+  obj.hear("setNums", o => { captured = o; count++ })
+  expect(captured).toBe(obj)
+  expect(count).toBe(1)
+  captured = undefined
+  obj.setNums(11,22)
+  expect(captured).toBe(obj)
+  expect(count).toBe(2)
+  expect(obj.sum).toBe(33)
+  expect(obj.dirty).toBe(true)
+  expect(obj.version).toBe(1)
+})
+
+test("quiet function call results", () => {
+  class C {
+    constructor(
+      readonly x:number = 0,
+    ) {}
+    reset(x:number) {
+      if (x < 0) {
+        return quiet(false)
+      }
+      const o = this as Mutable<C>
+      o.x = x
+      return true
+    }
+  }
+  const obj = loudify(new C())
+  let captured:Loud<C>|undefined = undefined
+  let count = 0
+  obj.hear("reset", o => { captured = o; count++ })
+  expect(captured).toBe(obj)
+  expect(count).toBe(1)
+  captured = undefined
+  obj.reset(-1)
+  expect(captured).toBeUndefined()
+  expect(count).toBe(1)
+  obj.reset(1)
+  expect(captured).toBe(obj)
+  expect(count).toBe(2)
+  expect(obj.x).toBe(1)
 })
 
 test("extendWith", () => {

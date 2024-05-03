@@ -14,11 +14,10 @@ const user = loudify({
 
 type User = typeof user
 
-user.hear("name", (user:User)=>{
+user.hear("name", user => {
   console.log("name changed to " + user.name)
 })
 
 user.name = "Flugelhorn"
 // console will print the change
 ```
-
