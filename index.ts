@@ -4,7 +4,7 @@ export type Mutable<T extends object> = { -readonly [K in keyof T]: T[K] }
 
 let globalBlock = false
 
-export type LoudKey<T> = { [K in keyof T]: K extends string ? K : never }
+export type LoudKey<T> = { [K in keyof T]: K extends string ? K : never }[keyof T]
 
 interface Hear<T extends object> {
   readonly hear:(key:LoudKey<T>, ear:Ear<Loud<T>>)=>void
