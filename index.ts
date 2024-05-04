@@ -46,6 +46,9 @@ export const loudify = <T extends object>(object:T):Loud<T> => {
     },
     get:(target:any, p:string | symbol, receiver:any):any => {
       const value = target[p]
+      if (p === "constructor") {
+        return target.constructor
+      }
       if (value instanceof Function) {
         return function (...args:any) {
           const oldGlobalBlock = globalBlock

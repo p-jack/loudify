@@ -253,3 +253,12 @@ describe("tx", () => {
     expect(o.y).toBe(3)
   })
 })
+
+test("constructors", () => {
+  class C {
+    constructor(public x:number) {}
+  }
+  const o = loudify(new C(0))
+  expect(o).toBeInstanceOf(C)
+  expect(o.constructor === C).toBe(true)  
+})
