@@ -4,13 +4,7 @@ export type Mutable<T extends object> = { -readonly [K in keyof T]: T[K] }
 
 let globalBlock = false
 
-type Same<T1,T2> =
-  (<G>() => G extends T1 ? 1 : 2) extends
-  (<G>() => G extends T2 ? 1 : 2) ? true : false;
-
-// All keys of T that are either (a) writable properties or (b) functions
-export type LoudKey<T> = 
-{ [K in keyof T]: Same<Pick<T,K>, Record<K,T[K]>> extends true ? K : never }[keyof T]
+export type LoudKey<T> = { [K in keyof T]: K extends string ? K : never }
 
 interface Hear<T extends object> {
   readonly hear:(key:LoudKey<T>, ear:Ear<Loud<T>>)=>void
