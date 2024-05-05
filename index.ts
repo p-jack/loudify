@@ -1,18 +1,14 @@
-export type Ear<T> = (changed:T)=>void;
-
 export type Mutable<T extends object> = { -readonly [K in keyof T]: T[K] }
 
 let globalBlock = false
 
-export type LoudKey<T> = { [K in keyof T]: K extends string ? K : never }[keyof T]
-
 interface Hear<T extends object> {
-  readonly hear:(key:LoudKey<T>, ear:Ear<Loud<T>>)=>void
-  readonly unhear:(key:LoudKey<T>, ear:Ear<Loud<T>>)=>void
-  readonly isHearing:(keys:LoudKey<T>, ear:Ear<Loud<T>>)=>boolean
+  readonly hear:(key:keyof T, ear:(changed:Loud<T>)=>void)=>void
+  readonly unhear:(key:keyof T, ear:(changed:Loud<T>)=>void)=>void
+  readonly isHearing:(key:keyof T, ear:(changed:Loud<T>)=>void)=>boolean
 }
 
-export type Loud<T extends object> = Hear<T> & T
+export type Loud<T extends object> = T & Hear<T>
 
 class Quiet<T> {
   constructor(readonly value:T) {}
@@ -23,7 +19,7 @@ export const quiet = <T>(value:T):T => new Quiet(value) as never
 const earSymbol = Symbol("ears")
 
 export const loudify = <T extends object>(object:T):Loud<T> => {
-  type E = Ear<Loud<T>>
+  type E = (changed:T)=>void
   const ears = new Map<keyof T, Set<E>>()
   const proxy = new Proxy(object, {
     set: (target:any, p:string | symbol, newValue:any, receiver:any):boolean => {
@@ -95,7 +91,7 @@ interface Batch<T extends object> {
 }
 
 const yell = <T extends object>(source:Loud<T>, key:keyof T) => {
-  const ears:Map<keyof T, Set<Ear<T>>> = (source as any)[earSymbol]
+  const ears:Map<keyof T, Set<(changed:T)=>void>> = (source as any)[earSymbol]
   const set = ears.get(key);
   set?.forEach(ear => { ear(source) })
 }
